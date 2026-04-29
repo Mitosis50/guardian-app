@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Guardian Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div class="logo">🛡️</div>
+      <div>
+        <h1>Agent Guardian</h1>
+        <p>Silent encrypted backups for your agent files.</p>
+      </div>
+    </header>
+
+    <!-- Tab navigation -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="settings" role="tab" aria-selected="true">⚙️ Settings</button>
+      <button class="tab" data-tab="backups" role="tab" aria-selected="false">📦 Backups</button>
+      <button class="tab recover-tab" data-tab="recovery" role="tab" aria-selected="false">🔄 Recover Files</button>
+    </nav>
+
+    <!-- ── TAB: Settings ─────────────────────────────────────── -->
+    <div id="tab-settings" class="tab-panel active">
+      <form id="settings-form">
+        <label>
+          Your email
+          <input id="email" type="email" autocomplete="off" placeholder="you@example.com" />
+          <span>Used to look up your backups for recovery. Never shared.</span>
+        </label>
+
+        <label>
+          Watch folder paths
+          <textarea id="watchPaths" rows="3" spellcheck="false"></textarea>
+          <span>One folder per line. Default: ~/.hermes and ~/.openclaw/workspace</span>
+        </label>
+
+        <label>
+          Encryption key path
+          <input id="encryptionKeyPath" type="text" spellcheck="false" />
+          <span>Your self-custody key. Back this file up somewhere safe — it's the only way to decrypt your files.</span>
+        </label>
+
+        <label>
+          Pinata JWT
+          <input id="pinataJWT" type="password" autocomplete="off" placeholder="Paste Pinata JWT" />
+          <span>Stored encrypted on this device only.</span>
+        </label>
+
+        <label>
+          Plan tier
+          <select id="tier">
+            <option value="free">Free — twice/month</option>
+            <option value="guardian">Guardian ($9/mo) — nightly</option>
+            <option value="pro">Guardian Pro ($19/mo) — every 6 hours</option>
+            <option value="lifetime">Lifetime ($149) — every hour</option>
+          </select>
+          <span id="tierNote" style="color:#fbbf24;">⚠️ Tier is set automatically on purchase. Manual changes are for testing only.</span>
+        </label>
+
+        <section class="summary">
+          <div><strong>Last upload</strong><span id="lastUploadAt">Never</span></div>
+          <div><strong>Queued files</strong><span id="queueCount">0</span></div>
+        </section>
+
+        <div class="actions">
+          <button type="submit">Save Settings</button>
+          <button type="button" id="uploadNow" class="secondary">⬆ Upload Now</button>
+        </div>
+        <p id="message"></p>
+      </form>
+    </div>
+
+    <!-- ── TAB: Backups ──────────────────────────────────────── -->
+    <div id="tab-backups" class="tab-panel">
+      <div class="panel-header">
+        <p class="panel-desc">All your encrypted backups stored permanently on IPFS.</p>
+        <button type="button" id="refreshBackups" class="secondary small">↻ Refresh</button>
+      </div>
+      <div id="backupList" class="backup-list">
+        <p class="empty-state">Enter your email in Settings, then click Refresh.</p>
+      </div>
+    </div>
+
+    <!-- ── TAB: Recover Files ────────────────────────────────── -->
+    <div id="tab-recovery" class="tab-panel">
+      <div class="recover-hero">
+        <div class="recover-icon">🔄</div>
+        <h2>Recover Your Files</h2>
+        <p>Downloads your latest backups from IPFS and decrypts them back to your machine. <strong>Your key never leaves this device.</strong></p>
+      </div>
+
+      <div class="recover-config">
+        <label>
+          Recover to folder
+          <input id="recoverOutputDir" type="text" spellcheck="false" placeholder="~/.hermes" />
+          <span>Where to write the recovered files. Defaults to your primary watch folder.</span>
+        </label>
+      </div>
+
+      <button type="button" id="recoverAllBtn" class="recover-btn">
+        🔄 &nbsp; Recover All My Files
+      </button>
+      <p class="recover-note">Fetches the latest version of every backed-up file and decrypts it locally.</p>
+
+      <!-- Progress log -->
+      <div id="recoverLog" class="recover-log" style="display:none;">
+        <div class="recover-log-header">
+          <span>Recovery Progress</span>
+          <button type="button" id="clearLog" class="tiny">✕ Clear</button>
+        </div>
+        <div id="recoverLogLines"></div>
+      </div>
+
+      <!-- Per-file recovery (shown after backup list loads) -->
+      <div id="recoverFileList" class="recover-file-list" style="display:none;">
+        <h3>Or recover a specific file:</h3>
+        <div id="recoverFileItems"></div>
+      </div>
+    </div>
+
+  </main>
+  <script src="settings.js"></script>
+</body>
+</html>

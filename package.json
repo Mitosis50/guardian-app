@@ -1,0 +1,55 @@
+{
+  "name": "agent-guardian-tray",
+  "version": "0.1.0",
+  "description": "Agent Guardian menubar/system tray app for encrypted IPFS backups.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "./node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .",
+    "build:mac": "electron-builder --mac dmg --arm64 --x64",
+    "build:win": "electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "@pinata/sdk": "^2.1.0",
+    "chokidar": "^3.6.0",
+    "electron-store": "^8.2.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.agentguardian.tray",
+    "productName": "Agent Guardian",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/AppIcon.icns",
+      "darkModeSupport": true,
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "copyright": "Copyright \u00a9 2026 Dr. Elbert Basa"
+  },
+  "author": {
+    "name": "Dr. Elbert Basa",
+    "email": "support@agentbotguardian.com",
+    "url": "https://agentbotguardian.com"
+  },
+  "homepage": "https://agentbotguardian.com",
+  "license": "SEE LICENSE IN LICENSE"
+}
