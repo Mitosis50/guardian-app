@@ -5,6 +5,7 @@ const { createTrayIcon } = require('./lib/icons')
 const { Queue } = require('./lib/queue')
 const { createWatcher } = require('./lib/watcher')
 const { createScheduler } = require('./lib/scheduler')
+const { HealthTrail } = require('./lib/health')
 const { encryptFile } = require('./lib/encryption')
 const { uploadEncryptedFile } = require('./lib/uploader')
 const { listBackups, recoverOne, recoverAll } = require('./lib/recovery')
@@ -15,6 +16,8 @@ let watcher
 let scheduler
 let currentState = 'idle'
 let isUploading = false
+let healthTrail
+let healthHeartbeatTimer
 const store = createStore()
 const queue = new Queue(store)
 
@@ -22,6 +25,7 @@ const STATE_LABELS = { idle: '🛡️', active: '🛡️⬆', alert: '🛡️!',
 
 function setState(state) {
   currentState = state
+  if (healthTrail) healthTrail.update({ state, ok: state !== 'error' })
   if (tray) {
     tray.setTitle(STATE_LABELS[state] || '🛡️')
     tray.setContextMenu(buildMenu())
@@ -59,15 +63,18 @@ async function handleChangedFile(filePath) {
     const config = getConfig(store)
     const encrypted = await encryptFile(filePath, config.encryptionKeyPath)
     queue.add({ filePath, encryptedPath: encrypted.outputPath, fileName: path.basename(filePath), queuedAt: new Date().toISOString() })
+    if (healthTrail) healthTrail.event('file:queued', { filePath, fileName: path.basename(filePath), queueSize: queue.size() })
     setState('alert')
   } catch (error) {
     console.error('[guardian] encrypt/queue failed:', error)
+    if (healthTrail) healthTrail.event('file:queue-error', { filePath, message: error.message })
     setState('error')
   }
 }
 
-async function uploadQueueNow() {
-  if (isUploading || queue.size() === 0) return
+async function uploadQueueNow(options = {}) {
+  if (isUploading) return { skipped: true, reason: 'upload-already-running', queueSize: queue.size() }
+  if (queue.size() === 0) return { skipped: true, reason: 'queue-empty', queueSize: 0 }
   isUploading = true
   setState('active')
 
@@ -89,14 +96,19 @@ async function uploadQueueNow() {
       addUploadLog(store, logItem)
       uploaded.push(item)
       console.log('[guardian] uploaded', logItem)
+      if (healthTrail) healthTrail.event('upload:success', { fileName: logItem.fileName, cid: logItem.cid })
     }
 
     queue.removeMany(uploaded)
     saveConfig(store, { lastUploadAt: new Date().toISOString() })
     setState(queue.size() > 0 ? 'alert' : 'idle')
+    return { skipped: false, uploadedCount: uploaded.length, queueSize: queue.size(), source: options.source || 'manual' }
   } catch (error) {
     console.error('[guardian] upload failed:', error)
+    if (healthTrail) healthTrail.event('upload:error', { message: error.message, source: options.source || 'manual' })
     setState('error')
+    if (options.throwOnError) throw error
+    return { skipped: false, error: error.message, uploadedCount: uploaded.length, queueSize: queue.size(), source: options.source || 'manual' }
   } finally {
     isUploading = false
   }
@@ -108,7 +120,8 @@ function restartServices() {
 
   const config = getConfig(store)
   watcher = createWatcher(config.watchPaths, handleChangedFile)
-  scheduler = createScheduler(config.tier, uploadQueueNow)
+  if (healthTrail) healthTrail.event('watcher:started', { watchPaths: config.watchPaths, queueSize: queue.size() })
+  scheduler = createScheduler(config.tier, () => uploadQueueNow({ source: 'cron', throwOnError: true }), { trail: healthTrail })
   setState(queue.size() > 0 ? 'alert' : 'idle')
 }
 
@@ -140,7 +153,8 @@ ipcMain.handle('guardian:save-config', (_event, partial) => {
   restartServices()
   return getConfig(store)
 })
-ipcMain.handle('guardian:upload-now', () => uploadQueueNow())
+ipcMain.handle('guardian:upload-now', () => uploadQueueNow({ source: 'manual' }))
+ipcMain.handle('guardian:get-health', () => healthTrail ? healthTrail.getHealth({ public: true }) : { ok: false, state: 'not-ready' })
 
 // ─── Recovery IPC ────────────────────────────────────────────────────────────
 ipcMain.handle('guardian:list-backups', async (_event, email) => {
@@ -190,6 +204,14 @@ ipcMain.handle('guardian:recover-one', async (event, { cid, filename, outputDir 
 
 app.whenReady().then(() => {
   app.setName('Agent Guardian')
+  healthTrail = new HealthTrail(app.getPath('userData'), { appVersion: app.getVersion() })
+  healthHeartbeatTimer = setInterval(() => {
+    const health = healthTrail.getHealth()
+    healthTrail.event('health:heartbeat', { state: currentState, queueSize: queue.size() }, {
+      scheduler: { lastHeartbeatAt: new Date().toISOString(), tier: health.scheduler.tier, expression: health.scheduler.expression }
+    })
+  }, 60 * 1000)
+  healthHeartbeatTimer.unref?.()
   tray = new Tray(createTrayIcon())
   tray.setTitle('🛡️')
   tray.setContextMenu(buildMenu())
@@ -205,4 +227,6 @@ app.on('window-all-closed', (event) => {
 app.on('before-quit', () => {
   if (watcher) watcher.close()
   if (scheduler) scheduler.stop()
+  if (healthHeartbeatTimer) clearInterval(healthHeartbeatTimer)
+  if (healthTrail) healthTrail.event('app:before-quit', { state: currentState, queueSize: queue.size() })
 })

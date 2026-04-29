@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('guardian', {
   // Backup
   uploadNow:    ()       => ipcRenderer.invoke('guardian:upload-now'),
 
+  // Health / cron trail
+  getHealth:    ()       => ipcRenderer.invoke('guardian:get-health'),
+
   // Recovery
   listBackups:  (email)  => ipcRenderer.invoke('guardian:list-backups', email),
   recoverAll:   (opts)   => ipcRenderer.invoke('guardian:recover-all', opts),
