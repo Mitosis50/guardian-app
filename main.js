@@ -48,6 +48,7 @@ function buildMenu() {
     { type: 'separator' },
     { label: 'Upload Now', enabled: pending > 0 && !isUploading, click: () => uploadQueueNow() },
     { label: 'Settings…', click: () => openSettingsWindow() },
+    { label: 'Open AI Install Guide', click: () => shell.openPath(path.join(__dirname, 'AI_AGENT_INSTALL_GUIDE.md')) },
     ...(recent.length ? [{ type: 'separator' }] : []),
     ...recent.map((item) => ({
       label: `${item.fileName} → ${String(item.cid).slice(0, 10)}…`,

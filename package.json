@@ -28,6 +28,7 @@
       "lib/**/*",
       "renderer/**/*",
       "assets/**/*",
+      "AI_AGENT_INSTALL_GUIDE.md",
       "package.json"
     ],
     "mac": {
