@@ -1,12 +1,12 @@
 # 🛡️ Agent Guardian — Quick Start Guide
 
-> Install once. Your agent files are protected forever.
+> Install once. Your agent files are protected with durable IPFS backups.
 
 ---
 
 ## What Is Agent Guardian?
 
-Agent Guardian is a macOS menubar app that silently watches your AI agent files, encrypts them, and backs them up to IPFS — permanently. If your machine dies, your agent's memory, soul, and identity survive.
+Agent Guardian is a macOS menubar app that silently watches your AI agent files, encrypts them, and backs them up to IPFS. If your machine dies, your agent's memory, soul, and identity survive.
 
 **The 7 files it protects:**
 
@@ -31,9 +31,9 @@ Visit [agentbotguardian.com](https://agentbotguardian.com) and pick your tier:
 | Plan | Price | Backup Frequency | Storage |
 |------|-------|-----------------|---------|
 | **Free** | $0 | Twice a month | IPFS |
-| **Guardian** | $9/mo | Every night | IPFS |
-| **Guardian Pro** | $19/mo | Every 6 hours | IPFS + Arweave |
-| **Lifetime** | $149 once | Every hour | IPFS + Arweave |
+| **Guardian** | $9 one-time | Every night | IPFS |
+| **Guardian Pro** | $19 one-time | Every 6 hours | IPFS |
+| **Lifetime** | $149 one-time | Every hour | IPFS |
 
 Click your plan → complete Gumroad checkout → you'll receive a confirmation email.
 

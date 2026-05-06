@@ -29,7 +29,7 @@ When Agent Guardian backs up a file, it:
 3. **Uploads** the encrypted `.enc` file to **IPFS** via Pinata
 4. **Logs** the upload with the file name, IPFS CID, and timestamp
 
-The encrypted file on IPFS is **permanently pinned** and **content-addressed** — it cannot be deleted, altered, or accessed without your key.
+The encrypted file on IPFS is **content-addressed and pinned** — it cannot be deleted, altered, or accessed without your key.
 
 ```
 Your file (MEMORY.md)
@@ -41,7 +41,7 @@ Your file (MEMORY.md)
   Encrypted blob (.enc)
        │
        ▼
-  IPFS via Pinata (permanent)
+  IPFS via Pinata
   → CID: bafyreig3x...
   → URL: https://gateway.pinata.cloud/ipfs/bafyreig3x...
 ```
@@ -78,7 +78,7 @@ After each upload, Agent Guardian logs the CID in your tray menu (last 5 uploads
 curl https://beneficial-commitment-production-4481.up.railway.app/api/agents/YOUR@EMAIL.com
 ```
 
-Save those CIDs. They are your permanent receipts.
+Save those CIDs. They are your content receipts.
 
 ---
 
@@ -374,7 +374,7 @@ cat ~/Library/Application\ Support/agent-guardian/agent-guardian.json 2>/dev/nul
 
 ## Downloading from IPFS
 
-IPFS files are permanent and accessible via multiple gateways. If one is slow or down, try another:
+IPFS files are content-addressed and accessible via multiple gateways. If one is slow or down, try another:
 
 ```bash
 CID="bafyreig3xYOUR_CID_HERE"
@@ -384,7 +384,6 @@ curl -o backup.enc "https://gateway.pinata.cloud/ipfs/$CID"
 
 # Fallback gateways:
 curl -o backup.enc "https://ipfs.io/ipfs/$CID"
-curl -o backup.enc "https://cloudflare-ipfs.com/ipfs/$CID"
 curl -o backup.enc "https://dweb.link/ipfs/$CID"
 
 # Via IPFS CLI (if installed locally)
