@@ -9,7 +9,10 @@
     "build:mac": "electron-builder --mac dmg --arm64 --x64",
     "build:win": "electron-builder --win nsis --x64",
     "test": "node --test tests/**/*.test.js",
-    "test:arweave": "node tests/arweave-integration.test.js"
+    "test:arweave": "node tests/arweave-integration.test.js",
+    "build:mac:ci": "electron-builder --mac dmg --arm64",
+    "scan:secrets": "node scripts/secret-scan.js",
+    "prepare:githooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@pinata/sdk": "^2.1.0",

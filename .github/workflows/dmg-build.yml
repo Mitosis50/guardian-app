@@ -1,0 +1,57 @@
+name: Agent Guardian DMG Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build-dmg:
+    name: Test and build unsigned macOS DMGs
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run secret scan
+        run: npm run scan:secrets
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build macOS DMGs
+        run: npm run build:mac
+
+      - name: List build outputs
+        run: |
+          find dist -maxdepth 2 -type f \( -name '*.dmg' -o -name '*.blockmap' -o -name '*.zip' \) -print
+          shasum -a 256 dist/*.dmg || true
+
+      - name: Upload DMG artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-guardian-dmgs-${{ github.sha }}
+          path: |
+            dist/*.dmg
+            dist/*.blockmap
+            dist/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 14
