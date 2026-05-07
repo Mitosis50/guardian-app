@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('guardian', {
   recoverAll:   (opts)   => ipcRenderer.invoke('guardian:recover-all', opts),
   recoverOne:   (opts)   => ipcRenderer.invoke('guardian:recover-one', opts),
 
+  // Local offline decrypt
+  pickEncFile:  ()       => ipcRenderer.invoke('guardian:pick-enc-file'),
+  decryptLocal: (opts)   => ipcRenderer.invoke('guardian:decrypt-local', opts),
+
   // Progress events (renderer listens via onRecoveryProgress)
   onRecoveryProgress: (callback) => {
     ipcRenderer.on('guardian:recovery-progress', (_event, msg) => callback(msg))

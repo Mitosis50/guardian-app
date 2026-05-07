@@ -86,7 +86,7 @@
       </div>
     </div>
 
-    <!-- ── TAB: Recover Files ────────────────────────────────── -->
+    <!-- ── TAB: Recover Files ─────────────────────────────────────────────────────────────────────────────────────── -->
     <div id="tab-recovery" class="tab-panel">
       <div class="recover-hero">
         <div class="recover-icon">🔄</div>
@@ -106,6 +106,24 @@
         🔄 &nbsp; Recover All My Files
       </button>
       <p class="recover-note">Fetches the latest version of every backed-up file and decrypts it locally.</p>
+
+      <!-- Local offline decrypt -->
+      <div class="local-decrypt-section">
+        <h3>🔐 Decrypt Local .enc File</h3>
+        <p class="recover-note">Recover a single encrypted file from your computer without using the cloud. Your key stays local.</p>
+        <div class="local-decrypt-actions">
+          <button type="button" id="pickEncFileBtn" class="secondary">📁 &nbsp; Select .enc File</button>
+          <span id="pickedEncFilePath" class="picked-path"></span>
+        </div>
+        <label>
+          Restore to folder
+          <input id="localDecryptOutputDir" type="text" spellcheck="false" placeholder="~/Agent-Guardian-Restored" />
+          <span>Decrypted file will be written here. Existing files are never overwritten—a timestamp is appended.</span>
+        </label>
+        <button type="button" id="localDecryptBtn" class="recover-btn" style="margin-top:10px; background: linear-gradient(135deg, #38bdf8, #0284c7); font-size: 16px; padding: 14px;">
+          🔓 &nbsp; Decrypt Selected File
+        </button>
+      </div>
 
       <!-- Progress log -->
       <div id="recoverLog" class="recover-log" style="display:none;">

@@ -233,6 +233,79 @@ clearLogBtn.addEventListener('click', () => {
   recoverLogEl.style.display = 'none'
 })
 
+// ─── Local Decrypt ──────────────────────────────────────────────────────────────────────────
+
+const pickEncFileBtn      = document.querySelector('#pickEncFileBtn')
+const pickedEncFilePathEl = document.querySelector('#pickedEncFilePath')
+const localDecryptBtn     = document.querySelector('#localDecryptBtn')
+const localDecryptOutputDirEl = document.querySelector('#localDecryptOutputDir')
+
+let pickedEncFile = null
+
+pickEncFileBtn.addEventListener('click', async () => {
+  try {
+    const result = await window.guardian.pickEncFile()
+    if (result.cancelled) return
+    pickedEncFile = result.filePath
+    pickedEncFilePathEl.textContent = pickedEncFile
+    appendLog(`📁 Selected: ${pickedEncFile}`, 'info')
+  } catch (err) {
+    appendLog(`❌ Failed to pick file: ${err.message}`, 'error')
+  }
+})
+
+localDecryptBtn.addEventListener('click', async () => {
+  if (!pickedEncFile) {
+    appendLog('❌ Please select an .enc file first.', 'error')
+    recoverLogEl.style.display = 'block'
+    return
+  }
+
+  const config = await window.guardian.getConfig()
+  const outputDir = localDecryptOutputDirEl.value.trim()
+    || pathJoin(osHome(), 'Agent-Guardian-Restored')
+
+  localDecryptBtn.disabled = true
+  localDecryptBtn.textContent = '⏳  Decrypting…'
+  recoverLogLines.innerHTML = ''
+  recoverLogEl.style.display = 'block'
+
+  appendLog(`🔓 Decrypting ${pathBasename(pickedEncFile)}…`, 'info')
+  appendLog(`📁 Output directory: ${outputDir}`, 'info')
+
+  try {
+    const result = await window.guardian.decryptLocal({ encFilePath: pickedEncFile, outputDir })
+    if (result.ok) {
+      appendLog(`✅ Decrypted successfully → ${result.path}`, 'success')
+    } else {
+      appendLog(`❌ Decryption failed: ${result.error}`, 'error')
+    }
+  } catch (err) {
+    appendLog(`❌ Decryption error: ${err.message}`, 'error')
+  } finally {
+    localDecryptBtn.disabled = false
+    localDecryptBtn.textContent = '🔓 \u00A0 Decrypt Selected File'
+  }
+})
+
+function osHome() {
+  // Best-effort home detection in renderer; fallback for display
+  if (localDecryptOutputDirEl.value.startsWith('~/')) return localDecryptOutputDirEl.value.slice(0, 2)
+  return '~'
+}
+
+function pathJoin(dir, name) {
+  // Very naive path join for display; actual resolution happens in main process
+  if (dir.endsWith('/')) return dir + name
+  return dir + '/' + name
+}
+
+function pathBasename(p) {
+  return p.replace(/\\/g, '/').split('/').pop()
+}
+
+// ─── Cloud Recovery ──────────────────────────────────────────────────────────────────────────
+
 recoverAllBtn.addEventListener('click', async () => {
   const config = await window.guardian.getConfig()
   const email  = config.email || ''

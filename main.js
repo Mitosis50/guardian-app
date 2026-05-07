@@ -1,13 +1,16 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, dialog } = require('electron')
 const path = require('path')
-const { createStore, getConfig, saveConfig, addUploadLog } = require('./lib/config')
+const fs = require('fs')
+const os = require('os')
+const { createStore, getConfig, saveConfig, addUploadLog, expandHome } = require('./lib/config')
 const { createTrayIcon } = require('./lib/icons')
 const { Queue } = require('./lib/queue')
 const { createWatcher } = require('./lib/watcher')
 const { createScheduler } = require('./lib/scheduler')
 const { HealthTrail } = require('./lib/health')
 const { encryptFile } = require('./lib/encryption')
-const { uploadEncryptedFile } = require('./lib/uploader')
+const { decryptFile } = require('./lib/decrypt')
+const { uploadEncryptedFile, uploadEncryptedFileWithProviders } = require('./lib/uploader')
 const { listBackups, recoverOne, recoverAll } = require('./lib/recovery')
 
 let tray
@@ -20,6 +23,26 @@ let healthTrail
 let healthHeartbeatTimer
 const store = createStore()
 const queue = new Queue(store)
+const QUEUE_DIR = path.join(os.homedir(), '.guardian-queue')
+
+function safeQueueFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return null
+  const resolvedQueueDir = path.resolve(QUEUE_DIR)
+  const resolvedFilePath = path.resolve(filePath)
+  if (!resolvedFilePath.startsWith(`${resolvedQueueDir}${path.sep}`)) return null
+  if (!/^\d+-[A-Za-z0-9._-]+\.enc$/.test(path.basename(resolvedFilePath))) return null
+  try {
+    if (!fs.statSync(resolvedQueueDir).isDirectory()) return null
+    const lstat = fs.lstatSync(resolvedFilePath)
+    if (!lstat.isFile()) return null
+    const realQueueDir = fs.realpathSync(resolvedQueueDir)
+    const realFilePath = fs.realpathSync(resolvedFilePath)
+    if (!realFilePath.startsWith(`${realQueueDir}${path.sep}`)) return null
+  } catch (_) {
+    return null
+  }
+  return resolvedFilePath
+}
 
 const STATE_LABELS = { idle: '🛡️', active: '🛡️⬆', alert: '🛡️!', error: '🛡️✗' }
 
@@ -82,25 +105,56 @@ async function uploadQueueNow(options = {}) {
   const config = getConfig(store)
   const items = queue.all()
   const uploaded = []
+  const invalid = []
 
   try {
-    if (!config.pinataJWT) throw new Error('Pinata JWT is missing. Open Settings and save your token.')
+    if (!config.pinataJWT && !config.arweaveEnabled) {
+      throw new Error('No storage providers configured. Open Settings and add Pinata JWT or enable Arweave.')
+    }
 
     for (const item of items) {
-      const result = await uploadEncryptedFile(item.encryptedPath, config.pinataJWT, item.fileName)
+      const uploadPath = safeQueueFilePath(item.encryptedPath)
+      if (!uploadPath) {
+        invalid.push(item)
+        if (healthTrail) healthTrail.event('queue:item-skipped', { fileName: item.fileName, reason: 'unsafe-or-missing-path' })
+        continue
+      }
+
+      const result = await uploadEncryptedFileWithProviders(uploadPath, config, item.fileName)
       const logItem = {
         fileName: item.fileName,
-        cid: result.cid,
-        ipfsUrl: result.ipfsUrl,
+        cid: result.results.ipfs ? result.results.ipfs.id : undefined,
+        ipfsUrl: result.results.ipfs ? result.results.ipfs.url : undefined,
+        arweaveTxId: result.results.arweave ? result.results.arweave.id : undefined,
+        arweaveUrl: result.results.arweave ? result.results.arweave.url : undefined,
+        providers: Object.keys(result.results),
         uploadedAt: new Date().toISOString()
       }
       addUploadLog(store, logItem)
-      uploaded.push(item)
       console.log('[guardian] uploaded', logItem)
-      if (healthTrail) healthTrail.event('upload:success', { fileName: logItem.fileName, cid: logItem.cid })
+      if (healthTrail) {
+        healthTrail.event('upload:success', {
+          fileName: logItem.fileName,
+          cid: logItem.cid,
+          arweaveTxId: logItem.arweaveTxId,
+          providers: logItem.providers
+        })
+      }
+
+      try {
+        fs.unlinkSync(uploadPath)
+        if (healthTrail) healthTrail.event('queue:file-removed', { fileName: item.fileName, encryptedPath: uploadPath })
+      } catch (removeError) {
+        if (removeError.code !== 'ENOENT') {
+          if (healthTrail) healthTrail.event('queue:file-remove-error', { fileName: item.fileName, encryptedPath: uploadPath, message: removeError.message })
+          throw new Error(`Uploaded ${item.fileName || 'queued file'} but local encrypted cleanup failed: ${removeError.message}`)
+        }
+      }
+
+      uploaded.push(item)
     }
 
-    queue.removeMany(uploaded)
+    queue.removeMany([...uploaded, ...invalid])
     saveConfig(store, { lastUploadAt: new Date().toISOString() })
     setState(queue.size() > 0 ? 'alert' : 'idle')
     return { skipped: false, uploadedCount: uploaded.length, queueSize: queue.size(), source: options.source || 'manual' }
@@ -120,6 +174,8 @@ function restartServices() {
   if (scheduler) scheduler.stop()
 
   const config = getConfig(store)
+  const reconciliation = queue.reconcileFromDisk(QUEUE_DIR)
+  if (healthTrail) healthTrail.event('queue:reconciled', { ...reconciliation, queueSize: queue.size() })
   watcher = createWatcher(config.watchPaths, handleChangedFile)
   if (healthTrail) healthTrail.event('watcher:started', { watchPaths: config.watchPaths, queueSize: queue.size() })
   scheduler = createScheduler(config.tier, () => uploadQueueNow({ source: 'cron', throwOnError: true }), { trail: healthTrail })
@@ -198,6 +254,44 @@ ipcMain.handle('guardian:recover-one', async (event, { cid, filename, outputDir 
       }
     })
     return { ok: true, path: outPath }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+// ─── Local File Decrypt (self-custody offline recovery) ────────────────────────
+
+ipcMain.handle('guardian:pick-enc-file', async () => {
+  if (!settingsWindow) return { cancelled: true }
+  const result = await dialog.showOpenDialog(settingsWindow, {
+    title: 'Select encrypted Agent Guardian file',
+    filters: [{ name: 'Encrypted files', extensions: ['enc'] }],
+    properties: ['openFile'],
+    defaultPath: QUEUE_DIR
+  })
+  if (result.canceled) return { cancelled: true }
+  return { filePath: result.filePaths[0] }
+})
+
+ipcMain.handle('guardian:decrypt-local', async (_event, { encFilePath, outputDir }) => {
+  const config = getConfig(store)
+  const keyPath = config.encryptionKeyPath
+  if (!encFilePath || !outputDir) {
+    return { ok: false, error: 'Encrypted file path and output directory are required.' }
+  }
+  try {
+    const resolvedOutputDir = expandHome(outputDir)
+    fs.mkdirSync(resolvedOutputDir, { recursive: true })
+    const baseName = path.basename(encFilePath).replace(/\.enc$/, '').replace(/^\d+-/, '')
+    let outPath = path.join(resolvedOutputDir, baseName)
+    // Prevent silent overwrites
+    if (fs.existsSync(outPath)) {
+      const ext = path.extname(baseName)
+      const name = ext ? baseName.slice(0, -ext.length) : baseName
+      outPath = path.join(resolvedOutputDir, `${name}-${Date.now()}${ext}`)
+    }
+    const resultPath = await decryptFile(encFilePath, keyPath, outPath)
+    return { ok: true, path: resultPath }
   } catch (err) {
     return { ok: false, error: err.message }
   }
