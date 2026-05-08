@@ -13,6 +13,8 @@ dist/
 *.mobileprovision
 .DS_Store
 ._*
-build/
+build/*
+!build/entitlements.mac.plist
+!build/entitlements.mac.inherit.plist
 coverage/
 .cache/

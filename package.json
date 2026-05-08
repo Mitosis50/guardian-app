@@ -43,14 +43,21 @@
       "darkModeSupport": true,
       "target": [
         "dmg"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": false,
+      "identity": null
     },
     "win": {
       "target": [
         "nsis"
       ]
     },
-    "copyright": "Copyright © 2026 Dr. Elbert Basa"
+    "copyright": "Copyright © 2026 Dr. Elbert Basa",
+    "afterSign": "scripts/notarize.js"
   },
   "author": {
     "name": "Dr. Elbert Basa",
